@@ -18,9 +18,12 @@ import os
 import sys
 import time
 import logging
+from cStringIO import StringIO
 from nose.plugins.base import Plugin
+from nose.plugins.cover import Coverage
 from nose.util import tolist
 from bitten.util import xmlio
+from bitten.util.testrunner import filter_coverage
 
 
 log = logging.getLogger('nose.plugins.nosebitten')
@@ -123,118 +126,38 @@ class BittenNosetests(Plugin):
         self.dom.write(open(self.options.xml_results, 'wt'), newlines=True)
 
 
-class BittenNoseCoverage(Plugin):
+class BittenNoseCoverage(Coverage):
     name = 'bitten-coverage'
 
-    def add_options(self, parser, env=os.environ):
+    def options(self, parser, env=os.environ):
+        Coverage.options(self, parser, env)
         Plugin.add_options(self, parser, env)
         parser.add_option(
-            '--xml-coverage', action='store', dest='xml_coverage',
+            '--coverage-summary', action='store', dest='coverage_summary',
             metavar='FILE', help='write XML coverage results to FILE. Default: %default',
-            default=os.path.join(os.getcwd(), 'build', 'coverage-results.xml')
+            default=os.path.join(os.getcwd(), 'build', 'coverage-results.txt')
         )
-        self.parser = parser
+        parser.add_option(
+            '--cover-packages', action='store', default=env.get('NOSE_COVER_PACKAGE'), dest='cover_packages'
+        )
 
     def configure(self, options, config):
-        Plugin.configure(self, options, config)
-        if self.enabled and not options.enable_plugin_coverage:
-            self.parser.error('You need to enable coverage')
-        self.conf = config
-        self.options = options
+        Coverage.configure(self, options, config)
+        self.coverage_summary = options.coverage_summary
 
     def begin(self):
-        if not os.path.exists(os.path.dirname(self.options.xml_coverage)):
-            os.makedirs(os.path.dirname(self.options.xml_coverage))
-        self.skipModules = sys.modules.keys()[:]
+        if not os.path.exists(os.path.dirname(self.coverage_summary)):
+            os.makedirs(os.path.dirname(self.coverage_summary))
+        Coverage.begin(self)
 
     def report(self, stream):
-        output = []
-        class myfile(object):
-            def write(self, towrite):
-                output.append(towrite)
-            def writelines(self, lines):
-                output.extend(lines)
-
-        import coverage
-        modules = [ module
-                    for name, module in sys.modules.items()
-                    if self.wantModuleCoverage(name, module) ]
-        coverage.report(modules, file=myfile(), show_missing=True)
-        coverage_re = re.compile(
-            r'(?P<mod>[\w\.]+)\s+(?P<lines>\d+)\s+(?P<exec>\d+)\s+'
-            r'(?P<cover>\d+)%?\s+(?P<miss>[\d,\s-]+)'
-        )
-        root = xmlio.Element('coverage-results')
-        for line in output:
-            filename = None
-            match = coverage_re.search(line)
-            if match and line.find('TOTAL') == -1:
-                module = match.group('mod')
-                if os.path.isdir(os.path.join(os.getcwd(), module.replace('.', os.sep))):
-                    mpath = os.path.join(
-                        os.getcwd(),
-                        module.replace('.', os.sep),
-                        '__init__.py'
-                    )
-                    if os.path.isfile(mpath):
-                        filename = mpath
-                else:
-                    if os.path.isfile(os.path.join(
-                        os.getcwd(), module.replace('.', os.sep)+'.py')):
-                        filename = os.path.join(
-                            os.getcwd(), module.replace('.', os.sep)+'.py'
-                        )
-                lines = match.group('lines')
-                hits = match.group('exec')
-                cover = match.group('cover')
-                if match.group('miss'):
-                    miss = ''.join(match.group('miss').split(','))
-                else:
-                    miss = ''
-                root.append(xmlio.Element(
-                    'coverage', file=filename, name=module,
-                    executed=hits, lines=lines, percentage=cover, miss=miss)
-                )
-        root.write(open(self.options.xml_coverage, 'w'), newlines=True)
-
-
-    def wantModuleCoverage(self, name, module):
-        if not hasattr(module, '__file__'):
-            log.debug("no coverage of %s: no __file__", name)
-            return False
-        root, ext = os.path.splitext(module.__file__)
-        if not ext in ('.py', '.pyc', '.pyo'):
-            log.debug("no coverage of %s: not a python file", name)
-            return False
-        if tolist(self.options.cover_packages):
-            for package in self.options.cover_packages:
-                if (name.startswith(package)
-                    and (self.options.cover_tests
-                         or not self.conf.testMatch.search(name))):
-                    log.debug("coverage for %s", name)
-                    return True
-        if name in self.skipModules:
-            log.debug("no coverage for %s: loaded before coverage start",
-                      name)
-            return False
-        if self.conf.testMatch.search(name) and not self.options.cover_tests:
-            log.debug("no coverage for %s: is a test", name)
-            return False
-        # accept any package that passed the previous tests, unless
-        # coverPackages is on -- in that case, if we wanted this
-        # module, we would have already returned True
-        return not self.options.cover_packages
-
-    def wantFile(self, file, package=None):
-        """If inclusive coverage enabled, return true for all source files
-        in wanted packages."""
-        if self.options.cover_inclusive:
-            if file.endswith(".py"):
-                if package and self.options.cover_packages:
-                    for want in self.options.cover_packages:
-                        if package.startswith(want):
-                            return True
-                else:
-                    return True
-        return None
-
+        buf = StringIO()
+        Coverage.report(self, buf)
+        buf.seek(0)
+        fileobj = open(self.coverage_summary, 'w')
+        try:
+            filter_coverage(buf, fileobj)
+        finally:
+            fileobj.close()
+        buf.seek(0)
+        stream.writelines(buf)
