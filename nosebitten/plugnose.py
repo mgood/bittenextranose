@@ -51,7 +51,6 @@ class BittenNosetests(Plugin):
         self.options = options
         self.conf = conf
 
-
     def begin(self):
         self.dom = xmlio.Element('unittest-results')
         log.debug('Starting Bitten Output')
@@ -60,7 +59,6 @@ class BittenNosetests(Plugin):
         self.fpaths = {}
         self.fpath = None
         self.tests = {}
-
 
     def startTest(self, test):
         name = str(test)
@@ -94,7 +92,6 @@ class BittenNosetests(Plugin):
         self.tests[str(test)]['fixture'] = fixture
         self.tests[str(test)]['description'] = description
 
-
     def addError(self, test, err, capt):
         self.tests[str(test)]['status'] = 'error'
         self.tests[str(test)]['traceback'] = err
@@ -108,7 +105,6 @@ class BittenNosetests(Plugin):
     def addSuccess(self, test, capt):
         self.tests[str(test)]['status'] = 'success'
         self.tests[str(test)]['output'] = capt
-
 
     def stopTest(self, test):
         # Enclose in a try because the nose colector apears here
