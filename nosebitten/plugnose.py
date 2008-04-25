@@ -61,62 +61,50 @@ class BittenNosetests(Plugin):
         self.tests = {}
 
     def startTest(self, test):
-        name = str(test)
-        fixture = None
-        description = test.shortDescription() or ''
-        self.test = {}
-        if description.startswith('doctest of '):
-            name = 'doctest'
-            fixture = description[11:]
-            description = None
-        elif description.startswith('Doctest: '):
-            name = 'doctest'
-            fixture = description
+        if hasattr(test, '_dt_test'): # DocTestCase
+            filename = test._dt_test.filename
         else:
-            match = re.match('(\w+)\s+\(([\w.]+)\)', name)
-            if match:
-                name = match.group(1)
-                fixture = match.group(2)
-        self.tests[str(test)] = {}
-        if fixture:
-            tpath = fixture.rsplit('.', 1)[0].replace('.', os.sep) + '.py'
-            if tpath.startswith('Doctest: '):
-                tpath = tpath[9:]
-
-            if not os.path.isfile(os.path.join(os.getcwd(), tpath)):
-                for sdir in ('test', 'tests', 'unittest', 'unitests'):
-                    if os.path.isfile(os.path.join(os.getcwd(), sdir, tpath)):
-                        tpath = os.path.join(sdir, tpath)
-            self.tests[str(test)]['file'] = tpath
-        self.tests[str(test)]['name'] = name
-        self.tests[str(test)]['fixture'] = fixture
-        self.tests[str(test)]['description'] = description
+            filename = sys.modules[test.__class__.__module__].__file__
+        if filename.endswith('.pyc'):
+            filename = filename[:-1]
+        self.tests[str(test)] = {
+            'fixture': test.id(),
+            'description': test.shortDescription() or '',
+            'file': filename,
+        }
 
     def addError(self, test, err, capt):
-        self.tests[str(test)]['status'] = 'error'
-        self.tests[str(test)]['traceback'] = err
-        self.tests[str(test)]['output'] = capt
+        self.tests[str(test)].update(
+            status='error',
+            traceback=err,
+            output=capt,
+        )
 
     def addFailure(self, test, err, capt, tb_info):
-        self.tests[str(test)]['status'] = 'failure'
-        self.tests[str(test)]['traceback'] = tb_info
-        self.tests[str(test)]['output'] = capt
+        self.tests[str(test)].update(
+            status='failure',
+            traceback=tb_info,
+            output=capt,
+        )
 
     def addSuccess(self, test, capt):
-        self.tests[str(test)]['status'] = 'success'
-        self.tests[str(test)]['output'] = capt
+        self.tests[str(test)].update(
+            status='success',
+            output=capt,
+        )
 
     def stopTest(self, test):
         # Enclose in a try because the nose colector apears here
         try:
-            if self.tests[str(test)].has_key('status'):
-                case = xmlio.Element('test')
-                for key, val in self.tests[str(test)].iteritems():
-                    if val:
-                        case.append(xmlio.Element(key)[val])
-                self.dom.append(case)
+            test_info = self.tests[str(test)]
         except KeyError:
-            pass
+            return
+        if 'status' in test_info:
+            case = xmlio.Element('test')
+            for key, val in test_info.iteritems():
+                if val:
+                    case.append(xmlio.Element(key)[val])
+            self.dom.append(case)
 
     def finalize(self, result):
         self.dom.write(open(self.options.xml_results, 'wt'), newlines=True)
