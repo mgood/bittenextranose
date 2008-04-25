@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import logging
+import traceback
 from cStringIO import StringIO
 from nose.plugins.base import Plugin
 from nose.plugins.cover import Coverage
@@ -76,14 +77,14 @@ class BittenNosetests(Plugin):
     def addError(self, test, err, capt):
         self.tests[str(test)].update(
             status='error',
-            traceback=err,
+            traceback=''.join(traceback.format_exception(*err)),
             output=capt,
         )
 
     def addFailure(self, test, err, capt, tb_info):
         self.tests[str(test)].update(
             status='failure',
-            traceback=tb_info,
+            traceback=''.join(traceback.format_exception(*err)),
             output=capt,
         )
 
