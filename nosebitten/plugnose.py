@@ -62,14 +62,11 @@ class BittenNosetests(Plugin):
         self.tests = {}
 
     def startTest(self, test):
-        if hasattr(test, '_dt_test'): # DocTestCase
-            filename = test._dt_test.filename
-        else:
-            filename = sys.modules[test.__class__.__module__].__file__
+        filename, module, _ = test.address()
         if filename.endswith('.pyc'):
             filename = filename[:-1]
         self.tests[str(test)] = {
-            'fixture': test.id(),
+            'fixture': module or test.id(),
             'description': test.shortDescription() or '',
             'file': filename,
         }
