@@ -13,16 +13,13 @@
 # Please view LICENSE for additional licensing information.
 # =============================================================================
 
-import re
 import os
-import sys
-import time
 import logging
 import traceback
 from cStringIO import StringIO
 from nose.plugins.base import Plugin
 from nose.plugins.cover import Coverage
-from nose.util import tolist, test_address
+from nose.util import test_address
 from bitten.util import xmlio
 from bitten.util.testrunner import filter_coverage
 
@@ -58,7 +55,6 @@ class BittenNosetests(Plugin):
         if not os.path.exists(os.path.dirname(self.options.xml_results)):
             os.makedirs(os.path.dirname(self.options.xml_results))
         self.dom = xmlio.Element('unittest-results')
-        self.test_results = []
 
     def _add_test_result(self, test, status, output, err=None):
         filename, module, _ = test_address(test)
