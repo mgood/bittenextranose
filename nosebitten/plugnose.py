@@ -56,45 +56,36 @@ class BittenNosetests(Plugin):
         log.debug('Starting Bitten Output')
         if not os.path.exists(os.path.dirname(self.options.xml_results)):
             os.makedirs(os.path.dirname(self.options.xml_results))
+        self.dom = xmlio.Element('unittest-results')
         self.test_results = []
 
     def _add_test_result(self, test, status, output, err=None):
         filename, module, _ = test_address(test)
-        if filename and filename.endswith('.pyc'):
+        if filename and (filename.endswith('.pyc') or filename.endswith('.pyo')):
             filename = filename[:-1]
-        result = {
-            'status': status,
-            'fixture': module or test.id(),
-            'description': test.shortDescription() or '',
-            'file': filename,
-            'output': output,
-        }
+        name = str(test)
+        fixture = module or test.id()
+        description = test.shortDescription() or ''
+        case = xmlio.Element('test', file=filename, name=name, fixture=fixture, status=status)
+        if description:
+            case.append(xmlio.Element('description')[description])
+        if output:
+            case.append(xmlio.Element('stdout')[output])
         if err is not None:
-            result['traceback'] = traceback.format_exception(*err)
-        self.test_results.append(result)
+            case.append(xmlio.Element('traceback')[traceback.format_exception(*err)])
+        self.dom.append(case)
 
     def addError(self, test, err, capt):
-        log.debug('addError %s', test)
         self._add_test_result(test, 'error', capt, err)
 
     def addFailure(self, test, err, capt, tb_info):
-        log.debug('addFailure %s', test)
         self._add_test_result(test, 'failure', capt, err)
 
     def addSuccess(self, test, capt):
-        log.debug('addSuccess %s', test)
         self._add_test_result(test, 'success', capt)
 
     def finalize(self, result):
-        log.debug('finalize dest = %s', self.options.xml_results)
-        dom = xmlio.Element('unittest-results')
-        for test_info in self.test_results:
-            case = xmlio.Element('test')
-            for key, val in test_info.iteritems():
-                if val:
-                    case.append(xmlio.Element(key)[val])
-            dom.append(case)
-        dom.write(open(self.options.xml_results, 'wt'), newlines=True)
+        self.dom.write(open(self.options.xml_results, 'wt'), newlines=True)
 
 
 class BittenNoseCoverage(Coverage):
