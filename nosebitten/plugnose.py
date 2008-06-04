@@ -42,7 +42,8 @@ class BittenNosetests(Plugin):
         Plugin.add_options(self, parser, env)
         parser.add_option(
             '--xml-results', action='store', dest='xml_results',
-            metavar='FILE', help='write XML test results to FILE. Default: %default',
+            metavar='FILE',
+            help='write XML test results to FILE. Default: %default',
             default=os.path.join(os.getcwd(), 'build', 'test-results.xml')
         )
 
@@ -61,18 +62,21 @@ class BittenNosetests(Plugin):
 
     def _add_test_result(self, test, status, output, err=None):
         filename, module, _ = test_address(test)
-        if filename and (filename.endswith('.pyc') or filename.endswith('.pyo')):
+        if filename and (filename.endswith('.pyc') or
+                         filename.endswith('.pyo')):
             filename = filename[:-1]
         name = str(test)
         fixture = module or test.id()
         description = test.shortDescription() or ''
-        case = xmlio.Element('test', file=filename, name=name, fixture=fixture, status=status)
+        case = xmlio.Element('test', file=filename, name=name, fixture=fixture,
+                             status=status)
         if description:
             case.append(xmlio.Element('description')[description])
         if output:
             case.append(xmlio.Element('stdout')[output])
         if err is not None:
-            case.append(xmlio.Element('traceback')[traceback.format_exception(*err)])
+            tb = traceback.format_exception(*err)
+            case.append(xmlio.Element('traceback')[tb])
         self.dom.append(case)
 
     def addError(self, test, err, capt):
@@ -96,11 +100,13 @@ class BittenNoseCoverage(Coverage):
         Plugin.add_options(self, parser, env)
         parser.add_option(
             '--coverage-summary', action='store', dest='coverage_summary',
-            metavar='FILE', help='write XML coverage results to FILE. Default: %default',
-            default=os.path.join(os.getcwd(), 'build', 'coverage-results.txt')
+            metavar='FILE',
+            help='write XML coverage results to FILE. Default: %default',
+            default=os.path.join(os.getcwd(), 'build', 'coverage-results.txt'),
         )
         parser.add_option(
-            '--cover-packages', action='store', default=env.get('NOSE_COVER_PACKAGE'), dest='cover_packages'
+            '--cover-packages', action='store', dest='cover_packages',
+            default=env.get('NOSE_COVER_PACKAGE'),
         )
 
     def configure(self, options, config):
