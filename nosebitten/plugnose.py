@@ -22,7 +22,7 @@ import traceback
 from cStringIO import StringIO
 from nose.plugins.base import Plugin
 from nose.plugins.cover import Coverage
-from nose.util import tolist
+from nose.util import tolist, test_address
 from bitten.util import xmlio
 from bitten.util.testrunner import filter_coverage
 
@@ -53,59 +53,48 @@ class BittenNosetests(Plugin):
         self.conf = conf
 
     def begin(self):
-        self.dom = xmlio.Element('unittest-results')
         log.debug('Starting Bitten Output')
         if not os.path.exists(os.path.dirname(self.options.xml_results)):
             os.makedirs(os.path.dirname(self.options.xml_results))
-        self.fpaths = {}
-        self.fpath = None
-        self.tests = {}
+        self.test_results = []
 
-    def startTest(self, test):
-        filename, module, _ = test.address()
-        if filename.endswith('.pyc'):
+    def _add_test_result(self, test, status, output, err=None):
+        filename, module, _ = test_address(test)
+        if filename and filename.endswith('.pyc'):
             filename = filename[:-1]
-        self.tests[str(test)] = {
+        result = {
+            'status': status,
             'fixture': module or test.id(),
             'description': test.shortDescription() or '',
             'file': filename,
+            'output': output,
         }
+        if err is not None:
+            result['traceback'] = traceback.format_exception(*err)
+        self.test_results.append(result)
 
     def addError(self, test, err, capt):
-        self.tests[str(test)].update(
-            status='error',
-            traceback=''.join(traceback.format_exception(*err)),
-            output=capt,
-        )
+        log.debug('addError %s', test)
+        self._add_test_result(test, 'error', capt, err)
 
     def addFailure(self, test, err, capt, tb_info):
-        self.tests[str(test)].update(
-            status='failure',
-            traceback=''.join(traceback.format_exception(*err)),
-            output=capt,
-        )
+        log.debug('addFailure %s', test)
+        self._add_test_result(test, 'failure', capt, err)
 
     def addSuccess(self, test, capt):
-        self.tests[str(test)].update(
-            status='success',
-            output=capt,
-        )
+        log.debug('addSuccess %s', test)
+        self._add_test_result(test, 'success', capt)
 
-    def stopTest(self, test):
-        # Enclose in a try because the nose colector apears here
-        try:
-            test_info = self.tests[str(test)]
-        except KeyError:
-            return
-        if 'status' in test_info:
+    def finalize(self, result):
+        log.debug('finalize dest = %s', self.options.xml_results)
+        dom = xmlio.Element('unittest-results')
+        for test_info in self.test_results:
             case = xmlio.Element('test')
             for key, val in test_info.iteritems():
                 if val:
                     case.append(xmlio.Element(key)[val])
-            self.dom.append(case)
-
-    def finalize(self, result):
-        self.dom.write(open(self.options.xml_results, 'wt'), newlines=True)
+            dom.append(case)
+        dom.write(open(self.options.xml_results, 'wt'), newlines=True)
 
 
 class BittenNoseCoverage(Coverage):
