@@ -12,9 +12,11 @@
 #
 # Please view LICENSE for additional licensing information.
 # =============================================================================
+# Patched by Kevin Tran on December 28, 2012 to update the usage of the Nose API and provide the duration (in seconds) each test ran for.
 
 import os
 import logging
+import time
 import traceback
 from cStringIO import StringIO
 from nose.plugins.base import Plugin
@@ -56,7 +58,7 @@ class BittenNosetests(Plugin):
             os.makedirs(os.path.dirname(self.options.xml_results))
         self.dom = xmlio.Element('unittest-results')
 
-    def _add_test_result(self, test, status, output, err=None):
+    def _add_test_result(self, test, status, output, duration, err=None):
         filename, module, _ = test_address(test)
         if filename and (filename.endswith('.pyc') or
                          filename.endswith('.pyo')):
@@ -65,7 +67,7 @@ class BittenNosetests(Plugin):
         fixture = module or test.id()
         description = test.shortDescription() or ''
         case = xmlio.Element('test', file=filename, name=name, fixture=fixture,
-                             status=status)
+                             status=status, duration=duration)
         if description:
             case.append(xmlio.Element('description')[description])
         if output:
@@ -75,17 +77,23 @@ class BittenNosetests(Plugin):
             case.append(xmlio.Element('traceback')[tb])
         self.dom.append(case)
 
-    def addError(self, test, err, capt):
-        self._add_test_result(test, 'error', capt, err)
+    def addError(self, test, err):
+        duration = time.time() - self.before_time
+        self._add_test_result(test.test, 'error', test.capturedOutput, duration, err)
 
-    def addFailure(self, test, err, capt, tb_info):
-        self._add_test_result(test, 'failure', capt, err)
+    def addFailure(self, test, err):
+        duration = time.time() - self.before_time
+        self._add_test_result(test.test, 'failure', test.capturedOutput, duration, err)
 
-    def addSuccess(self, test, capt):
-        self._add_test_result(test, 'success', capt)
+    def addSuccess(self, test):
+        duration = time.time() - self.before_time
+        self._add_test_result(test.test, 'success', test.capturedOutput, duration)
 
     def finalize(self, result):
         self.dom.write(open(self.options.xml_results, 'wt'), newlines=True)
+
+    def beforeTest(self, test):
+        self.before_time = time.time()
 
 
 class BittenNoseCoverage(Coverage):
