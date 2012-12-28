@@ -18,7 +18,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='BittenExtraNose',
-    version='0.1',
+    version='0.2',
     author='Pedro Algarvio',
     author_email = 'ufs@ufsoft.org',
     description = 'Bitten Nose plugins',
@@ -26,9 +26,9 @@ setup(
     packages = find_packages(),
     install_requires=['nose>=0.9.2', 'bitten==dev,>=0.6dev-r378'],
     entry_points = {
-        'nose.plugins': [
+        'nose.plugins.0.10': [
             'bitten#nosetests = nosebitten.plugnose:BittenNosetests',
             'bitten#nosecoverage = nosebitten.plugnose:BittenNoseCoverage'
-         ]
+        ]
     }
 )
